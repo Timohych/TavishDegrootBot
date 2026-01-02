@@ -3,7 +3,7 @@ from aiogram.filters import Command
 from aiogram.types import ChatPermissions
 from datetime import datetime, timedelta
 
-from config import dp, bot, warnings
+from config import dp, bot, storage
 from utils import parse_time, is_admin
 
 # --- START ---
@@ -30,9 +30,11 @@ async def cmd_ban(message: types.Message):
         return await message.reply("У тебя нет прав, сынок!")
 
     user_id = message.reply_to_message.from_user.id
+    user_name = message.reply_to_message.from_user.full_name
     try:
         await bot.ban_chat_member(message.chat.id, user_id)
-        await message.answer(f"🚫 Пользователь {message.reply_to_message.from_user.full_name} был забанен!")
+        storage.add_ban(message.chat.id, user_id, user_name)
+        await message.answer(f"🚫 Пользователь {user_name} был забанен!")
     except Exception as e:
         await message.reply(f"Не удалось забанить. Ошибка: {e}")
 
@@ -69,12 +71,14 @@ async def cmd_mute(message: types.Message):
         if parsed: duration = parsed
 
     user_id = message.reply_to_message.from_user.id
+    user_name = message.reply_to_message.from_user.full_name
     permissions = ChatPermissions(can_send_messages=False)
     until = datetime.now() + timedelta(seconds=duration)
 
     try:
         await bot.restrict_chat_member(message.chat.id, user_id, permissions, until_date=until)
-        await message.answer(f"😶 {message.reply_to_message.from_user.full_name} заткнут на {duration/60} мин.")
+        storage.add_mute(message.chat.id, user_id, user_name, until.isoformat())
+        await message.answer(f"😶 {user_name} заткнут на {duration/60} мин.")
     except Exception as e:
         await message.reply(f"Не удалось замутить. Ошибка: {e}")
 
@@ -101,6 +105,7 @@ async def cmd_unmute(message: types.Message):
 
     try:
         await bot.restrict_chat_member(chat_id=message.chat.id, user_id=user_id, permissions=permissions)
+        storage.remove_mute(message.chat.id, user_id)
         await message.answer(f"🔊 {message.reply_to_message.from_user.full_name} снова может говорить!")
     except Exception as e:
         await message.reply(f"Не удалось размутить. Ошибка: {e}")
@@ -118,13 +123,8 @@ async def cmd_warn(message: types.Message):
     user_id = message.reply_to_message.from_user.id
     user_name = message.reply_to_message.from_user.full_name
 
-    if chat_id not in warnings:
-        warnings[chat_id] = {}
-    if user_id not in warnings[chat_id]:
-        warnings[chat_id][user_id] = 0
-
-    warnings[chat_id][user_id] += 1
-    count = warnings[chat_id][user_id]
+    storage.add_warn(chat_id, user_id)
+    count = storage.get_warns(chat_id, user_id)
 
     if count >= 3:
         duration = 86400  
@@ -133,8 +133,9 @@ async def cmd_warn(message: types.Message):
 
         try:
             await bot.restrict_chat_member(chat_id, user_id, permissions, until_date=until)
+            storage.add_mute(chat_id, user_id, user_name, until.isoformat())
             await message.answer(f"⚠️ {user_name} получил третий варн!\n🤐 Замучен на 24 часа")
-            warnings[chat_id][user_id] = 0
+            storage.reset_warns(chat_id, user_id)
         except Exception as e:
             await message.reply(f"Не удалось выдать мут: {e}")
     else:
@@ -149,9 +150,8 @@ async def cmd_unwarn(message: types.Message):
     chat_id = message.chat.id
     user_id = message.reply_to_message.from_user.id
     
-    if chat_id in warnings and user_id in warnings[chat_id]:
-        warnings[chat_id][user_id] = 0
-        await message.reply("Счетчик варна обнулен.")
+    storage.reset_warns(chat_id, user_id)
+    await message.reply("Счетчик варна обнулен.")
 
 # --- UNBAN ---
 @dp.message(Command("unban"))
@@ -175,6 +175,7 @@ async def cmd_unban(message: types.Message):
 
     try:
         await bot.unban_chat_member(message.chat.id, user_id, only_if_banned=True)
+        storage.remove_ban(message.chat.id, user_id)
         await message.answer(f"✅ {user_name} Разбанен!")
     except Exception as e:
         await message.reply(f"Не удалось разбанить. Ошибка: {e}")
