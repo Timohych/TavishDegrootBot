@@ -52,6 +52,11 @@ class Storage:
             data[str(chat_id)][str(user_id)] = 0
             self._write_file(self.warns_file, data)
     
+    def get_all_warns(self, chat_id: int) -> Dict:
+        """Get all warns in a chat"""
+        data = self._read_file(self.warns_file)
+        return data.get(str(chat_id), {})
+    
     # --- BANS ---
     def add_ban(self, chat_id: int, user_id: int, user_name: str):
         """Record a ban"""
@@ -70,6 +75,11 @@ class Storage:
         if str(chat_id) in data and str(user_id) in data[str(chat_id)]:
             del data[str(chat_id)][str(user_id)]
             self._write_file(self.bans_file, data)
+    
+    def get_all_bans(self, chat_id: int) -> Dict:
+        """Get all bans in a chat"""
+        data = self._read_file(self.bans_file)
+        return data.get(str(chat_id), {})
     
     # --- MUTES ---
     def add_mute(self, chat_id: int, user_id: int, user_name: str, until_date: str):
@@ -90,3 +100,8 @@ class Storage:
         if str(chat_id) in data and str(user_id) in data[str(chat_id)]:
             del data[str(chat_id)][str(user_id)]
             self._write_file(self.mutes_file, data)
+    
+    def get_all_mutes(self, chat_id: int) -> Dict:
+        """Get all mutes in a chat"""
+        data = self._read_file(self.mutes_file)
+        return data.get(str(chat_id), {})

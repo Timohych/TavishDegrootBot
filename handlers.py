@@ -179,3 +179,60 @@ async def cmd_unban(message: types.Message):
         await message.answer(f"✅ {user_name} Разбанен!")
     except Exception as e:
         await message.reply(f"Не удалось разбанить. Ошибка: {e}")
+
+# --- BANLIST ---
+@dp.message(Command("banlist"))
+async def cmd_banlist(message: types.Message):
+    if not await is_admin(message):
+        return await message.reply("У тебя нет прав!")
+    
+    bans = storage.get_all_bans(message.chat.id)
+    
+    if not bans:
+        return await message.answer("📋 Список забаненных пуст.")
+    
+    text = "🚫 **ЗАБАНЕННЫЕ ПОЛЬЗОВАТЕЛИ:**\n\n"
+    for user_id, ban_info in bans.items():
+        text += f"👤 {ban_info['name']} (ID: {user_id})\n"
+        text += f"   🕐 {ban_info['banned_at']}\n\n"
+    
+    await message.answer(text)
+
+# --- WARNLIST ---
+@dp.message(Command("warnlist"))
+async def cmd_warnlist(message: types.Message):
+    if not await is_admin(message):
+        return await message.reply("У тебя нет прав!")
+    
+    warns = storage.get_all_warns(message.chat.id)
+    
+    if not warns:
+        return await message.answer("📋 Список варнов пуст.")
+    
+    text = "⚠️ **ПРЕДУПРЕЖДЕНИЯ:**\n\n"
+    for user_id, warn_count in warns.items():
+        if warn_count > 0:
+            text += f"👤 ID: {user_id} - {warn_count}/3 варнов\n"
+    
+    if text == "⚠️ **ПРЕДУПРЕЖДЕНИЯ:**\n\n":
+        return await message.answer("📋 Список варнов пуст.")
+    
+    await message.answer(text)
+
+# --- MUTELIST ---
+@dp.message(Command("mutelist"))
+async def cmd_mutelist(message: types.Message):
+    if not await is_admin(message):
+        return await message.reply("У тебя нет прав!")
+    
+    mutes = storage.get_all_mutes(message.chat.id)
+    
+    if not mutes:
+        return await message.answer("📋 Список замученных пуст.")
+    
+    text = "😶 **ЗАМУЧЕННЫЕ ПОЛЬЗОВАТЕЛИ:**\n\n"
+    for user_id, mute_info in mutes.items():
+        text += f"👤 {mute_info['name']} (ID: {user_id})\n"
+        text += f"   🕐 До: {mute_info['until']}\n\n"
+    
+    await message.answer(text)
