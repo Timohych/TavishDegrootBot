@@ -2,7 +2,7 @@ import logging
 from aiogram import Bot, Dispatcher
 from storage import Storage
 
-TOKEN = "Insert_Your_Bot_Token_Here"
+TOKEN = "YOUR_BOT_TOKEN_HERE"
 
 # logs
 logging.basicConfig(level=logging.INFO)

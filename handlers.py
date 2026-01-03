@@ -6,6 +6,11 @@ from datetime import datetime, timedelta
 from config import dp, bot, storage
 from utils import parse_time, is_admin
 
+def get_display_name(user_id: int, real_name: str) -> str:
+    """Get nickname if set, otherwise return real name"""
+    nickname = storage.get_nickname(user_id)
+    return nickname if nickname else real_name
+
 # --- START ---
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
@@ -17,7 +22,9 @@ async def cmd_start(message: types.Message):
         "/kick - Выгнать\n"
         "/mute [время] - Замутить (например: /mute 10m)\n"
         "/unmute - Размутить\n"
-        "/warn - Выдать предупреждение (3 варна = бан)"
+        "/warn - Выдать предупреждение (3 варна = бан)\n"
+        "/nickname [имя] - Установить свой ник\n"
+        "/mynickname - Посмотреть свой ник"
     )
 
 # --- BAN ---
@@ -31,10 +38,11 @@ async def cmd_ban(message: types.Message):
 
     user_id = message.reply_to_message.from_user.id
     user_name = message.reply_to_message.from_user.full_name
+    display_name = get_display_name(user_id, user_name)
     try:
         await bot.ban_chat_member(message.chat.id, user_id)
         storage.add_ban(message.chat.id, user_id, user_name)
-        await message.answer(f"🚫 Пользователь {user_name} был забанен!")
+        await message.answer(f"🚫 Пользователь {display_name} был забанен!")
     except Exception as e:
         await message.reply(f"Не удалось забанить. Ошибка: {e}")
 
@@ -48,10 +56,12 @@ async def cmd_kick(message: types.Message):
         return
 
     user_id = message.reply_to_message.from_user.id
+    user_name = message.reply_to_message.from_user.full_name
+    display_name = get_display_name(user_id, user_name)
     try:
         await bot.ban_chat_member(message.chat.id, user_id)
         await bot.unban_chat_member(message.chat.id, user_id)
-        await message.answer(f"👞 {message.reply_to_message.from_user.full_name} схватил поджопника!")
+        await message.answer(f"👞 {display_name} схватил поджопника!")
     except Exception:
         await message.reply("Много хочешь, олух!")
 
@@ -72,13 +82,14 @@ async def cmd_mute(message: types.Message):
 
     user_id = message.reply_to_message.from_user.id
     user_name = message.reply_to_message.from_user.full_name
+    display_name = get_display_name(user_id, user_name)
     permissions = ChatPermissions(can_send_messages=False)
     until = datetime.now() + timedelta(seconds=duration)
 
     try:
         await bot.restrict_chat_member(message.chat.id, user_id, permissions, until_date=until)
         storage.add_mute(message.chat.id, user_id, user_name, until.isoformat())
-        await message.answer(f"😶 {user_name} заткнут на {duration/60} мин.")
+        await message.answer(f"😶 {display_name} заткнут на {duration/60} мин.")
     except Exception as e:
         await message.reply(f"Не удалось замутить. Ошибка: {e}")
 
@@ -92,6 +103,8 @@ async def cmd_unmute(message: types.Message):
         return await message.reply("Много хочешь, олух!")
 
     user_id = message.reply_to_message.from_user.id
+    user_name = message.reply_to_message.from_user.full_name
+    display_name = get_display_name(user_id, user_name)
     permissions = ChatPermissions(
         can_send_messages=True,
         can_send_media_messages=True,
@@ -106,7 +119,7 @@ async def cmd_unmute(message: types.Message):
     try:
         await bot.restrict_chat_member(chat_id=message.chat.id, user_id=user_id, permissions=permissions)
         storage.remove_mute(message.chat.id, user_id)
-        await message.answer(f"🔊 {message.reply_to_message.from_user.full_name} снова может говорить!")
+        await message.answer(f"🔊 {display_name} снова может говорить!")
     except Exception as e:
         await message.reply(f"Не удалось размутить. Ошибка: {e}")
 
@@ -122,6 +135,7 @@ async def cmd_warn(message: types.Message):
     chat_id = message.chat.id
     user_id = message.reply_to_message.from_user.id
     user_name = message.reply_to_message.from_user.full_name
+    display_name = get_display_name(user_id, user_name)
 
     storage.add_warn(chat_id, user_id)
     count = storage.get_warns(chat_id, user_id)
@@ -134,12 +148,12 @@ async def cmd_warn(message: types.Message):
         try:
             await bot.restrict_chat_member(chat_id, user_id, permissions, until_date=until)
             storage.add_mute(chat_id, user_id, user_name, until.isoformat())
-            await message.answer(f"⚠️ {user_name} получил третий варн!\n🤐 Замучен на 24 часа")
+            await message.answer(f"⚠️ {display_name} получил третий варн!\n🤐 Замучен на 24 часа")
             storage.reset_warns(chat_id, user_id)
         except Exception as e:
             await message.reply(f"Не удалось выдать мут: {e}")
     else:
-        await message.answer(f"⚠️ {user_name}, получил варн[{count}/3]")
+        await message.answer(f"⚠️ {display_name} получил варн [{count}/3]")
 
 # --- UNWARN ---
 @dp.message(Command("unwarn"))
@@ -162,6 +176,7 @@ async def cmd_unban(message: types.Message):
     if message.reply_to_message:
         user_id = message.reply_to_message.from_user.id
         user_name = message.reply_to_message.from_user.full_name
+        display_name = get_display_name(user_id, user_name)
     else:
         args = message.text.split()
         if len(args) < 2:
@@ -171,12 +186,12 @@ async def cmd_unban(message: types.Message):
             return await message.reply("ID пользователя должен состоять из цифр!")
         
         user_id = int(args[1])
-        user_name = f"пользователя с ID {user_id}"
+        display_name = f"пользователя с ID {user_id}"
 
     try:
         await bot.unban_chat_member(message.chat.id, user_id, only_if_banned=True)
         storage.remove_ban(message.chat.id, user_id)
-        await message.answer(f"✅ {user_name} Разбанен!")
+        await message.answer(f"✅ {display_name} Разбанен!")
     except Exception as e:
         await message.reply(f"Не удалось разбанить. Ошибка: {e}")
 
@@ -193,7 +208,8 @@ async def cmd_banlist(message: types.Message):
     
     text = "🚫 **ЗАБАНЕННЫЕ ПОЛЬЗОВАТЕЛИ:**\n\n"
     for user_id, ban_info in bans.items():
-        text += f"👤 {ban_info['name']} (ID: {user_id})\n"
+        display_name = get_display_name(int(user_id), ban_info['name'])
+        text += f"👤 {display_name} (ID: {user_id})\n"
         text += f"   🕐 {ban_info['banned_at']}\n\n"
     
     await message.answer(text)
@@ -232,7 +248,37 @@ async def cmd_mutelist(message: types.Message):
     
     text = "😶 **ЗАМУЧЕННЫЕ ПОЛЬЗОВАТЕЛИ:**\n\n"
     for user_id, mute_info in mutes.items():
-        text += f"👤 {mute_info['name']} (ID: {user_id})\n"
+        display_name = get_display_name(int(user_id), mute_info['name'])
+        text += f"👤 {display_name} (ID: {user_id})\n"
         text += f"   🕐 До: {mute_info['until']}\n\n"
     
     await message.answer(text)
+
+# --- NICKNAME ---
+@dp.message(Command("nickname"))
+async def cmd_nickname(message: types.Message):
+    args = message.text.split(maxsplit=1)
+    
+    if len(args) < 2:
+        return await message.reply("Использование: /nickname [имя]\nПример: /nickname Демолиционщик")
+    
+    nickname = args[1].strip()
+    
+    if len(nickname) > 32:
+        return await message.reply("❌ Ник слишком длинный! Максимум 32 символа.")
+    
+    if len(nickname) < 1:
+        return await message.reply("❌ Ник не может быть пустым!")
+    
+    storage.set_nickname(message.from_user.id, nickname)
+    await message.answer(f"✅ Твой ник установлен: **{nickname}**")
+
+# --- MY NICKNAME ---
+@dp.message(Command("mynickname"))
+async def cmd_mynickname(message: types.Message):
+    nickname = storage.get_nickname(message.from_user.id)
+    
+    if nickname:
+        await message.answer(f"👤 Твой ник: **{nickname}**")
+    else:
+        await message.answer("❌ У тебя нет установленного ника. Установи его командой /nickname [имя]")

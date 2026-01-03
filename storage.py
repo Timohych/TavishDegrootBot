@@ -9,11 +9,12 @@ class Storage:
         self.warns_file = os.path.join(base_dir, "warns.json")
         self.bans_file = os.path.join(base_dir, "bans.json")
         self.mutes_file = os.path.join(base_dir, "mutes.json")
+        self.nicknames_file = os.path.join(base_dir, "nicknames.json")
         self._init_files()
     
     def _init_files(self):
         """Initialize JSON files if they don't exist"""
-        for file in [self.warns_file, self.bans_file, self.mutes_file]:
+        for file in [self.warns_file, self.bans_file, self.mutes_file, self.nicknames_file]:
             if not os.path.exists(file):
                 with open(file, 'w') as f:
                     json.dump({}, f)
@@ -105,3 +106,25 @@ class Storage:
         """Get all mutes in a chat"""
         data = self._read_file(self.mutes_file)
         return data.get(str(chat_id), {})
+    
+    # --- NICKNAMES ---
+    def set_nickname(self, user_id: int, nickname: str):
+        """Set or update a user's nickname"""
+        data = self._read_file(self.nicknames_file)
+        data[str(user_id)] = {
+            "nickname": nickname,
+            "set_at": datetime.now().isoformat()
+        }
+        self._write_file(self.nicknames_file, data)
+    
+    def get_nickname(self, user_id: int) -> str:
+        """Get a user's nickname"""
+        data = self._read_file(self.nicknames_file)
+        return data.get(str(user_id), {}).get("nickname")
+    
+    def remove_nickname(self, user_id: int):
+        """Remove a user's nickname"""
+        data = self._read_file(self.nicknames_file)
+        if str(user_id) in data:
+            del data[str(user_id)]
+            self._write_file(self.nicknames_file, data)
