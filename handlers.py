@@ -260,7 +260,7 @@ async def cmd_nickname(message: types.Message):
     args = message.text.split(maxsplit=1)
     
     if len(args) < 2:
-        return await message.reply("Использование: /nickname [имя]\nПример: /nickname Демолиционщик")
+        return await message.reply("Использование: /nickname [имя]\nПример: /nickname Повелитель Тархуна")
     
     nickname = args[1].strip()
     
@@ -282,3 +282,60 @@ async def cmd_mynickname(message: types.Message):
         await message.answer(f"👤 Твой ник: **{nickname}**")
     else:
         await message.answer("❌ У тебя нет установленного ника. Установи его командой /nickname [имя]")
+
+# --- PROFILE ---
+@dp.message(Command("profile"))
+async def cmd_profile(message: types.Message):
+    if message.reply_to_message:
+        user = message.reply_to_message.from_user
+    else:
+        user = message.from_user
+    
+    user_id = user.id
+    user_name = user.full_name
+    display_name = get_display_name(user_id, user_name)
+    
+    # Get user avatar
+    photos = await bot.get_user_profile_photos(user_id, limit=1)
+    
+    profile_text = (
+        f"👤{display_name}\n\n"
+        f"🪪 ID: {user_id}"
+    )
+    
+    if photos.total_count > 0:
+        await message.answer_photo(
+            photo=photos.photos[0][-1].file_id,
+            caption=profile_text
+        )
+    else:
+        await message.answer(profile_text)
+
+# --- RULES ---
+@dp.message(Command("rules"))
+async def cmd_rules(message: types.Message):
+    rules = storage.get_rules(message.chat.id)
+    
+    if rules:
+        await message.answer(f"📋 ПРАВИЛА ЧАТА:\n\n{rules}")
+    else:
+        await message.answer("❌ Правила для этого чата не установлены.")
+
+# --- SETRULES ---
+@dp.message(Command("setrules"))
+async def cmd_setrules(message: types.Message):
+    if not await is_admin(message):
+        return await message.reply("У тебя нет прав устанавливать правила!")
+    
+    args = message.text.split(maxsplit=1)
+    
+    if len(args) < 2:
+        return await message.reply("Использование: /setrules [текст правил]\nПример: /setrules Не спамить, быть вежливым...")
+    
+    rules_text = args[1].strip()
+    
+    if len(rules_text) > 2000:
+        return await message.reply("❌ Правила слишком длинные! Максимум 2000 символов.")
+    
+    storage.set_rules(message.chat.id, rules_text)
+    await message.answer("✅ Правила чата обновлены!")

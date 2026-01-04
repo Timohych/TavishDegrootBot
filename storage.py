@@ -10,11 +10,12 @@ class Storage:
         self.bans_file = os.path.join(base_dir, "bans.json")
         self.mutes_file = os.path.join(base_dir, "mutes.json")
         self.nicknames_file = os.path.join(base_dir, "nicknames.json")
+        self.rules_file = os.path.join(base_dir, "rules.json")
         self._init_files()
     
     def _init_files(self):
         """Initialize JSON files if they don't exist"""
-        for file in [self.warns_file, self.bans_file, self.mutes_file, self.nicknames_file]:
+        for file in [self.warns_file, self.bans_file, self.mutes_file, self.nicknames_file, self.rules_file]:
             if not os.path.exists(file):
                 with open(file, 'w') as f:
                     json.dump({}, f)
@@ -128,3 +129,18 @@ class Storage:
         if str(user_id) in data:
             del data[str(user_id)]
             self._write_file(self.nicknames_file, data)
+    
+    # --- RULES ---
+    def set_rules(self, chat_id: int, rules_text: str):
+        """Set rules for a chat"""
+        data = self._read_file(self.rules_file)
+        data[str(chat_id)] = {
+            "rules": rules_text,
+            "set_at": datetime.now().isoformat()
+        }
+        self._write_file(self.rules_file, data)
+    
+    def get_rules(self, chat_id: int) -> str:
+        """Get rules for a chat"""
+        data = self._read_file(self.rules_file)
+        return data.get(str(chat_id), {}).get("rules")
